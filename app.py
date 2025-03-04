@@ -16,7 +16,6 @@ app.config['JWT_TOKEN_LOCATION'] = ['cookies']  # 🔥 Assicura che Flask legga 
 app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token'  # Nome del cookie JWT
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # 🔥 Disabilita la protezione CSRF per il test (puoi abilitarla più tardi)
 
-
 db.init_app(app)
 
 # 🔒 Lista dei token invalidati
