@@ -1,8 +1,8 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt, get_jwt_identity, create_refresh_token
 from werkzeug.security import check_password_hash
 from models import db, User, Vehicle, Cart, Booking, BookingCode, TokenBlacklist
-from datetime import datetime, timedelta
+import datetime
 import re
 from dateutil import parser  # Aggiungi questa importazione in cima al file
 from functools import wraps
@@ -119,35 +119,42 @@ def register_user():
     except Exception as e:
         return jsonify({"error": f"Errore durante la registrazione: {str(e)}"}), 500
 
+# Login user restituendo un cookie contenente l'accessToken JWT
 @api.route('/login', methods=['POST'])
-def login_user():
-    data = request.get_json()
-
-    if not data or 'email' not in data or 'password' not in data:
-        return jsonify({"error": "Email e password sono richiesti."}), 400
-
-    email = data['email'].strip()
-    password = data['password'].strip()
+def login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
     
-    user = User.find_by_email(email)
-    if not user or not check_password_hash(user.password, password):
-        return jsonify({"error": "Credenziali errate."}), 401
+    # 🔍 Recupera l'utente dal DB tramite email
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'message': 'Invalid credentials'}), 401
+    
+    # 👀 Verifica la password
+    if not check_password_hash(user.password, password):
+        return jsonify({'message': 'Invalid credentials'}), 401
 
-    # Genera entrambi i token
-    access_token = create_access_token(
-        identity=str(user.id),
-        additional_claims={"role": user.role}  # ✅ Aggiunge il ruolo
-    )
-    refresh_token = create_refresh_token(
-        identity=str(user.id),
-        additional_claims={"role": user.role}  # ✅ Aggiunge il ruolo
-    )
+    # ✅ Usa l'ID dell'utente come identity
+    access_token = create_access_token(identity=str(user.id), expires_delta=datetime.timedelta(hours=1))
+    refresh_token = create_refresh_token(identity=str(user.id), expires_delta=datetime.timedelta(days=7))
 
-    return jsonify({
-        "message": "Login effettuato con successo!",
-        "access_token": access_token,
-        "refresh_token": refresh_token
-    }), 200
+    response = make_response(jsonify({'message': 'Login successful'}))
+    response.set_cookie(
+        'access_token',
+        access_token,
+        httponly=True,
+        secure=True,  # Necessario su HTTPS
+        samesite="None"
+    )
+    response.set_cookie(
+        'refresh_token',
+        refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="None"
+    )
+    return response
 
 # Endpoint per l'update del profilo utente
 @api.route('/update-profile', methods=['PUT'])
@@ -226,7 +233,7 @@ def delete_account():
 
 @api.route('/logout', methods=['POST'])
 @jwt_required()
-def logout_user():
+def logout_user_old():
     """
     Effettua il logout e revoca il token
     """
@@ -236,7 +243,23 @@ def logout_user():
         return jsonify({"message": "Logout effettuato con successo."}), 200
     except Exception as e:
         return jsonify({"error": f"Errore durante il logout: {str(e)}"}), 500
-   
+
+@api.route('/logout', methods=['POST'])
+def logout():
+    try:
+        jti = get_jwt()["jti"]  # Ottieni il JWT ID
+        response = make_response(jsonify({'message': 'Logged out'}))
+        response.set_cookie('access_token', '', expires=0)  # Cancella il cookie
+        return response
+    except Exception as e:
+        return jsonify({'error': f'Errore durante il logout: {str(e)}'}), 500
+    
+@api.route('/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    current_user = get_jwt_identity()
+    return jsonify({'message': f'Hello {current_user}, you are authenticated!'})
+    
 @api.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)  # Richiede un refresh token valido
 def refresh_token():
@@ -283,34 +306,20 @@ def get_all_users():
 @api.route('/profile', methods=['GET'])
 @jwt_required()
 def get_user_profile():
-    """
-    👤 Recupera il profilo dell'utente autenticato
-    ---
-    tags:
-      - Users
-    security:
-      - Bearer: []
-    responses:
-      200:
-        description: Profilo dell'utente recuperato con successo
-      404:
-        description: Utente non trovato
-    """
     try:
-        # 🔐 Ottieni l'ID dell'utente dal token JWT
+        # 🔐 user_id ora è un intero (es: 1)
         user_id = get_jwt_identity()
-
-        # 🔍 Cerca l'utente nel database
+        print(user_id)
+        
+        # 🔍 Recupera l'utente dal DB usando la PK
         user = User.query.get(user_id)
-
-        if user:
-            return jsonify({
-                "message": "Profilo utente recuperato con successo.",
-                "user": user.to_dict()
-            }), 200
-        else:
+        if not user:
             return jsonify({"error": "Utente non trovato."}), 404
 
+        return jsonify({
+            "message": "Profilo utente recuperato con successo.",
+            "user": user.to_dict()  # E.g. { "id": 1, "email": "a@gmail" }
+        }), 200
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero del profilo: {str(e)}"}), 500
 

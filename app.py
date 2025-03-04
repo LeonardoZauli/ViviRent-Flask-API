@@ -7,16 +7,23 @@ from flasgger import Swagger
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
+
+
 # Configurazione dell'app Flask
 app = Flask(__name__)
 app.config.from_object(Config)
+app.config['JWT_TOKEN_LOCATION'] = ['cookies']  # 🔥 Assicura che Flask legga i JWT solo dai cookie
+app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token'  # Nome del cookie JWT
+app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # 🔥 Disabilita la protezione CSRF per il test (puoi abilitarla più tardi)
+
+
 db.init_app(app)
 
 # 🔒 Lista dei token invalidati
 jwt_blacklist = set()
 
 # Abilita CORS per tutte le rotte
-CORS(app)
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://localhost:5173"}})
 
 # ✅ Configurazione JWT
 jwt = JWTManager(app)
@@ -42,4 +49,5 @@ app.register_blueprint(api, url_prefix='/api')
 
 # Esegui l'app Flask
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(ssl_context=('cert.pem', 'key.pem'), debug=True)
+
