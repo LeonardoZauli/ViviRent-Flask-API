@@ -2,7 +2,9 @@ from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt, get_jwt_identity, create_refresh_token
 from werkzeug.security import check_password_hash
 from models import db, User, Vehicle, Cart, Booking, BookingCode, TokenBlacklist
-import datetime
+import datetime as dt  # Rinominato per evitare conflitti
+from datetime import datetime  # Classe datetime senza conflitti
+from datetime import timedelta  # ✅ Import corretto
 import re
 from dateutil import parser  # Aggiungi questa importazione in cima al file
 from functools import wraps
@@ -141,8 +143,8 @@ def login():
 
     print(user)
     # ✅ Usa l'ID dell'utente come identity
-    access_token = create_access_token(identity=str(user.id), additional_claims={"role": user.role}, expires_delta=datetime.timedelta(hours=1))
-    refresh_token = create_refresh_token(identity=str(user.id), additional_claims={"role": user.role}, expires_delta=datetime.timedelta(days=7))
+    access_token = create_access_token(identity=str(user.id), additional_claims={"role": user.role}, expires_delta=dt.timedelta(hours=1))
+    refresh_token = create_refresh_token(identity=str(user.id), additional_claims={"role": user.role}, expires_delta=dt.timedelta(days=7))
 
     response = make_response(jsonify({'message': 'Login successful'}))
     response.set_cookie(
@@ -297,6 +299,21 @@ def refresh_token():
     except Exception as e:
         return jsonify({"error": f"Errore durante il refresh token: {str(e)}"}), 500
   
+@api.route('/get-role', methods=['GET'])
+@jwt_required()  # ✅ Verifica il token JWT nel cookie httpOnly
+def get_role():
+    try:
+        claims = get_jwt()  # 🔥 Ottiene i dati dal JWT
+        user_role = claims.get("role", None)  # Recupera il ruolo aggiunto nel token
+
+        if not user_role:
+            return jsonify({"error": "Ruolo non trovato nel token"}), 400
+
+        return jsonify({"role": user_role}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Errore nel recupero del ruolo: {str(e)}"}), 500
+    
 @api.route('/users', methods=['GET'])
 @jwt_required()
 @admin_required
@@ -348,7 +365,6 @@ def get_user_profile():
         return jsonify({"error": f"Errore durante il recupero del profilo: {str(e)}"}), 500
 
 ######################### VEHICLES #########################
-
 
 @api.route('/vehicles', methods=['GET'])
 def get_all_vehicles():
