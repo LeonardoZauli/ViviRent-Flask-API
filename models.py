@@ -4,8 +4,8 @@ from sqlalchemy import and_, or_
 from datetime import datetime
 from datetime import timedelta
 from sqlalchemy.exc import SQLAlchemyError
-import json, hashlib
-from werkzeug.security import generate_password_hash
+import json, hashlib, re
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Message  # Importa Message per l'email
 from extensions import mail  # Importa mail dall'estensione di Flask-Mail
 
@@ -47,32 +47,70 @@ class User(db.Model):
             'register_ts': self.register_ts.strftime('%Y-%m-%d %H:%M:%S') if self.register_ts else None  # Gestisce il caso None
         }
 
+    def update_password(self, current_password, new_password):
+        """
+        ✅ Metodo per aggiornare la password dell'utente.
+        """
+        # 🔍 Controlla se la password attuale è corretta
+        if not check_password_hash(self.password, current_password):
+            raise ValueError("La password attuale non è corretta.")
+
+        # ✅ Validazione nuova password
+        if len(new_password) < 8:
+            raise ValueError("La nuova password deve avere almeno 8 caratteri.")
+        if current_password == new_password:
+            raise ValueError("La nuova password non può essere uguale alla precedente.")
+
+        # 🔒 Hash della nuova password
+        self.password = generate_password_hash(new_password)
+
+        # ✅ Salva nel database
+        db.session.commit()
+    
     # Aggiungere un nuovo utente
     @staticmethod
     def add_user(name, surname, password, email, bday, place, role="user"):
-        # 🔒 Genera l'hash una sola volta
-        hashed_password = generate_password_hash(password)
-        # print(Password Hash Generata:", hashed_password)
+        # ✅ Rimuove spazi bianchi extra e normalizza i dati
+        name = name.strip()
+        surname = surname.strip()
+        email = email.strip().lower()
+        place = place.strip()
+        role = role.strip().lower()
 
+        # ✅ Validazione nome e cognome (solo lettere e spazi)
+        if not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$", name):
+            raise ValueError("Il nome contiene caratteri non validi.")
+        if not re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$", surname):
+            raise ValueError("Il cognome contiene caratteri non validi.")
+
+        # ✅ Validazione email
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            raise ValueError("Formato email non valido.")
+
+        # ✅ Validazione password (min 8 caratteri, almeno 1 numero e 1 lettera)
+        if not re.match(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$", password):
+            raise ValueError("La password deve contenere almeno 8 caratteri, una lettera e un numero.")
+
+        # ✅ Validazione del ruolo (accetta solo "user", "admin", "moderator")
+        if role not in ["user", "admin", "moderator"]:
+            raise ValueError("Ruolo non valido.")
+
+        # 🔒 Genera l'hash della password
+        hashed_password = generate_password_hash(password)
+
+        # ✅ Crea l'utente
         new_user = User(
             name=name,
             surname=surname,
-            password=hashed_password,  # Usa l'hash generato
+            password=hashed_password,
             email=email,
             bday=bday,
             place=place,
             role=role
         )
 
-        # 🔍 Verifica immediata prima di salvare
-        # print(🔍 Hash prima di salvare:", new_user.password)
-
         db.session.add(new_user)
         db.session.commit()
-
-        # 🔍 Controllo immediato dopo il commit
-        saved_user = User.find_by_email(email)
-        # print(🔍 Hash salvato nel DB:", saved_user.password)
 
         return new_user.to_dict()
 

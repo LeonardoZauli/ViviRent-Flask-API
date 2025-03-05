@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt, get_jwt_identity, create_refresh_token
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, User, Vehicle, Cart, Booking, BookingCode, TokenBlacklist
 import datetime as dt  # Rinominato per evitare conflitti
 from datetime import datetime  # Classe datetime senza conflitti
@@ -14,13 +14,6 @@ jwt_blacklist = set()
 
 # ✅ Creazione del Blueprint
 api = Blueprint('api', __name__)
-
-
-# ✅ Funzione per validare il formato dell'email
-def is_valid_email(email):
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return re.match(pattern, email)
-
 
 # 🔒 Controllo ruolo admin
 def admin_required(fn):
@@ -41,31 +34,19 @@ def admin_required(fn):
 @api.route('/register', methods=['POST'])
 def register_user():
     """
-    Registra un nuovo utente e restituisce un JWT
-    ---
-    tags:
-      - Users
-    consumes:
-      - application/json
-    responses:
-      200:
-        description: Utente registrato con successo
-      400:
-        description: Dati non validi o email già registrata
+    Registra un nuovo utente e imposta JWT nei cookie httpOnly
     """
-    # ✅ Ricezione dei dati JSON
     data = request.get_json()
 
     if not data:
         return jsonify({"error": "Richiesta non valida. Il payload JSON è richiesto."}), 400
 
-    # ✅ Verifica dei campi obbligatori
     required_fields = ['name', 'surname', 'password', 'email', 'bday', 'place']
     for field in required_fields:
         if field not in data or not data[field].strip():
             return jsonify({"error": f"Il campo '{field}' è obbligatorio."}), 400
 
-    # ✅ Pulizia dei dati
+    # ✅ Pulizia e validazione
     name = data['name'].strip()
     surname = data['surname'].strip()
     password = data['password'].strip()
@@ -99,28 +80,46 @@ def register_user():
         )
 
         # 🔍 Recupera l'ID dal database dopo il commit
-        user_instance = User.find_by_email(email)  # ✅ Ottieni l'istanza dal DB
+        user_instance = User.find_by_email(email)
         if not user_instance:
             return jsonify({"error": "Errore durante la registrazione: Utente non trovato dopo il commit."}), 500
 
-        # ➕ Crea un nuovo carrello
+        # ➕ Crea un nuovo carrello per l'utente
         cart = Cart.create_cart(user_instance.id)
-        
-        # Genera entrambi i token
+
+        # ✅ Generazione dei token JWT con ruolo incluso
         access_token = create_access_token(
             identity=str(user_instance.id),
-            additional_claims={"role": user_instance.role}  # ✅ Aggiunge il ruolo
+            additional_claims={"role": user_instance.role},
+            expires_delta=timedelta(hours=1)
         )
         refresh_token = create_refresh_token(
             identity=str(user_instance.id),
-            additional_claims={"role": user_instance.role}  # ✅ Aggiunge il ruolo
+            additional_claims={"role": user_instance.role},
+            expires_delta=timedelta(days=7)
         )
 
-        return jsonify({
-            "message": "Login effettuato con successo!",
-            "access_token": access_token,
-            "refresh_token": refresh_token
-        }), 200
+        # ✅ Creazione della risposta con i cookie
+        response = make_response(jsonify({"message": "Registrazione avvenuta con successo!"}))
+
+        response.set_cookie(
+            "access_token",
+            access_token,
+            httponly=True,
+            secure=True,  # 🔥 Imposta a False per test in locale senza HTTPS
+            samesite="None",
+            path="/"
+        )
+        response.set_cookie(
+            "refresh_token",
+            refresh_token,
+            httponly=True,
+            secure=True,  # 🔥 Imposta a False per test in locale senza HTTPS
+            samesite="None",
+            path="/"
+        )
+
+        return response, 200
 
     except Exception as e:
         return jsonify({"error": f"Errore durante la registrazione: {str(e)}"}), 500
@@ -141,7 +140,7 @@ def login():
     if not check_password_hash(user.password, password):
         return jsonify({'message': 'Invalid credentials'}), 401
 
-    print(user)
+    #print(user)
     # ✅ Usa l'ID dell'utente come identity
     access_token = create_access_token(identity=str(user.id), additional_claims={"role": user.role}, expires_delta=dt.timedelta(hours=1))
     refresh_token = create_refresh_token(identity=str(user.id), additional_claims={"role": user.role}, expires_delta=dt.timedelta(days=7))
@@ -167,18 +166,18 @@ def login():
 @api.route('/update-profile', methods=['PUT'])
 @jwt_required()
 def update_user():
-    # print(✅ La richiesta è stata ricevuta.")
+    # #print(✅ La richiesta è stata ricevuta.")
     
     try:
         data = request.get_json()
-        # print(📥 Dati ricevuti:", data)
+        # #print(📥 Dati ricevuti:", data)
 
         if not data:
             return jsonify({"error": "Nessun dato ricevuto per l'aggiornamento."}), 400
 
         # 🔐 Ottieni l'ID dell'utente dal token JWT
         user_id = get_jwt_identity()
-        # print(🔑 ID Utente dal JWT:", user_id)
+        # #print(🔑 ID Utente dal JWT:", user_id)
 
         updated_user = User.update_user(
             user_id=user_id,
@@ -197,7 +196,7 @@ def update_user():
         else:
             return jsonify({"error": "Utente non trovato."}), 404
     except Exception as e:
-        # print(Errore:", str(e))
+        # #print(Errore:", str(e))
         return jsonify({"error": "Errore imprevisto."}), 500
 
 @api.route('/delete-profile', methods=['DELETE'])
@@ -219,7 +218,7 @@ def delete_account():
     try:
         # 🔐 Ottieni l'ID utente dal token JWT
         user_id = get_jwt_identity()
-        print(user_id)
+        #print(user_id)
 
         # 🔄 Elimina l'utente
         result = User.delete_user(user_id)
@@ -237,19 +236,6 @@ def delete_account():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'eliminazione dell'account: {str(e)}"}), 500
-
-@api.route('/logout', methods=['POST'])
-@jwt_required()
-def logout_user_old():
-    """
-    Effettua il logout e revoca il token
-    """
-    try:
-        jti = get_jwt()["jti"]  # Ottieni il JWT ID
-        TokenBlacklist.add_token(jti)  # Aggiungi alla blacklist
-        return jsonify({"message": "Logout effettuato con successo."}), 200
-    except Exception as e:
-        return jsonify({"error": f"Errore durante il logout: {str(e)}"}), 500
 
 @api.route('/logout', methods=['POST'])
 def logout():
@@ -350,7 +336,7 @@ def get_user_profile():
     try:
         # 🔐 user_id ora è un intero (es: 1)
         user_id = get_jwt_identity()
-        print(user_id)
+        ##print(user_id)
         
         # 🔍 Recupera l'utente dal DB usando la PK
         user = User.query.get(user_id)
@@ -363,6 +349,54 @@ def get_user_profile():
         }), 200
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero del profilo: {str(e)}"}), 500
+
+@api.route('/change-password', methods=['POST'])
+@jwt_required()  # 🔒 Richiede autenticazione tramite JWT
+def change_password():
+    """
+    Permette a un utente autenticato di cambiare la password
+    """
+    try:
+        # ✅ Ottiene l'utente attuale dal token JWT
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"error": "Utente non trovato"}), 404
+
+        # ✅ Riceve i dati JSON
+        data = request.get_json()
+
+        if not data or "current_password" not in data or "new_password" not in data:
+            return jsonify({"error": "Dati mancanti"}), 400
+
+        # ✅ Aggiorna la password usando il metodo `update_password`
+        user.update_password(data["current_password"].strip(), data["new_password"].strip())
+
+        return jsonify({"message": "Password aggiornata con successo!"}), 200
+
+    except ValueError as e:  # 🔍 Cattura errori specifici di validazione
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Errore durante la modifica della password: {str(e)}"}), 500
+
+@api.route('/password-reset/request', methods=['POST'])
+def request_password_reset():
+    data = request.get_json()
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"error": "Email richiesta"}), 400
+
+    user = User.find_by_email(email=email)
+
+    if not user:
+        return jsonify({"error": "Nessun utente trovato con questa email"}), 400
+
+    # ✅ Crea un token di reset con scadenza di 30 minuti
+    reset_token = create_access_token(identity=user.id, expires_delta=timedelta(minutes=30))
+
+    return jsonify({"reset_token": reset_token}), 200
 
 ######################### VEHICLES #########################
 
@@ -777,11 +811,11 @@ def create_cart():
 def add_item_to_user_cart():
     try:
         user_id = get_jwt_identity()
-        print(user_id)
+        ##print(user_id)
 
         # 🔍 Recupera il carrello attivo per l'utente
         carts = Cart.get_carts_by_user(user_id)
-        print(carts)
+        #print(carts)
         active_cart = next((cart for cart in carts if cart['status'] == 'active'), None)
 
         if not active_cart:
@@ -817,7 +851,7 @@ def add_item_to_user_cart():
         }), 200
 
     except Exception as e:
-        # print(f"Errore completo: {str(e)}")
+        # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante l'aggiunta del prodotto: {str(e)}"}), 500
 
 
@@ -846,7 +880,7 @@ def remove_item_from_cart(item_id):
         return jsonify(result), 200
 
     except Exception as e:
-        # print(f"Errore completo: {str(e)}")
+        # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante la rimozione del prodotto: {str(e)}"}), 500
 
 
@@ -869,7 +903,7 @@ def get_user_cart_basic():
         return jsonify(cart_data), 200
 
     except Exception as e:
-        # print(f"Errore completo: {str(e)}")
+        # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante il recupero del carrello: {str(e)}"}), 500
 
 
@@ -892,7 +926,7 @@ def get_user_cart_detailed():
         return jsonify(detailed_cart_data), 200
 
     except Exception as e:
-        # print(f"Errore completo: {str(e)}")
+        # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante il recupero dettagliato del carrello: {str(e)}"}), 500
 
 ######################## BOOKINGS #########################
