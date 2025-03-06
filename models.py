@@ -47,19 +47,12 @@ class User(db.Model):
             'register_ts': self.register_ts.strftime('%Y-%m-%d %H:%M:%S') if self.register_ts else None  # Gestisce il caso None
         }
 
-    def update_password(self, current_password, new_password):
+    def update_password(self, new_password):
         """
         ✅ Metodo per aggiornare la password dell'utente.
         """
-        # 🔍 Controlla se la password attuale è corretta
-        if not check_password_hash(self.password, current_password):
-            raise ValueError("La password attuale non è corretta.")
-
-        # ✅ Validazione nuova password
         if len(new_password) < 8:
-            raise ValueError("La nuova password deve avere almeno 8 caratteri.")
-        if current_password == new_password:
-            raise ValueError("La nuova password non può essere uguale alla precedente.")
+            raise ValueError("La password deve avere almeno 8 caratteri.")
 
         # 🔒 Hash della nuova password
         self.password = generate_password_hash(new_password)

@@ -398,6 +398,37 @@ def request_password_reset():
 
     return jsonify({"reset_token": reset_token}), 200
 
+@api.route('/password-reset/<string:token>', methods=['POST'])
+@jwt_required()
+def reset_password(token):
+    """
+    ✅ Endpoint per aggiornare la password dopo il reset
+    """
+    try:
+        # ✅ Ottiene l'ID utente dal token JWT
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"error": "Utente non trovato"}), 404
+
+        # ✅ Riceve la nuova password dal payload JSON
+        data = request.get_json()
+        new_password = data.get("new_password")
+
+        if not new_password:
+            return jsonify({"error": "La nuova password è obbligatoria."}), 400
+
+        # ✅ Aggiorna la password tramite il metodo della classe `User`
+        user.update_password(new_password)
+
+        return jsonify({"message": "Password aggiornata con successo!"}), 200
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Errore durante il reset della password: {str(e)}"}), 500
+
 ######################### VEHICLES #########################
 
 @api.route('/vehicles', methods=['GET'])
@@ -426,7 +457,6 @@ def get_all_vehicles():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero dei veicoli: {str(e)}"}), 500
-
 
 @api.route('/vehicles/<int:vehicle_id>', methods=['GET'])
 def get_vehicle_by_id(vehicle_id):
@@ -464,7 +494,6 @@ def get_vehicle_by_id(vehicle_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero del veicolo: {str(e)}"}), 500
 
-
 @api.route('/vehicles/license/<string:license_type>', methods=['GET'])
 def get_vehicles_by_license(license_type):
     """
@@ -501,7 +530,6 @@ def get_vehicles_by_license(license_type):
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero dei veicoli: {str(e)}"}), 500
 
-
 @api.route('/vehicles/available', methods=['GET'])
 def get_available_vehicles():
     """
@@ -531,7 +559,6 @@ def get_available_vehicles():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero dei veicoli disponibili: {str(e)}"}), 500
-
 
 @api.route('/vehicles', methods=['POST'])
 @jwt_required()  # 🔐 Richiede autenticazione JWT
@@ -581,7 +608,6 @@ def add_vehicle():
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiunta del veicolo: {str(e)}"}), 500
 
-
 @api.route('/vehicles/update/<int:vehicle_id>', methods=['PUT'])
 @jwt_required()  # 🔐 Richiede autenticazione JWT
 @admin_required
@@ -626,7 +652,6 @@ def update_vehicle(vehicle_id):
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiornamento del veicolo: {str(e)}"}), 500
-
 
 @api.route('/vehicles/available-range', methods=['GET'])
 def get_available_vehicles_range():
@@ -680,7 +705,6 @@ def get_available_vehicles_range():
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero dei veicoli disponibili: {str(e)}"}), 500
 
-
 @api.route('/vehicles/<int:vehicle_id>', methods=['DELETE'])
 @jwt_required()  # 🔐 Richiede autenticazione JWT
 @admin_required
@@ -718,12 +742,11 @@ def delete_vehicle(vehicle_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante l'eliminazione del veicolo: {str(e)}"}), 500
 
-
 @api.route('/check-moto-availability', methods=['POST'])
 def check_moto_availability():
     """
     🔍 Controlla se una moto è già prenotata in un intervallo di date.
-    ---
+    ---  
     tags:
       - Bookings
     consumes:
@@ -753,7 +776,7 @@ def check_moto_availability():
     try:
         data = request.get_json()
 
-        # Controlla la presenza dei dati richiesti
+        # Controllo parametri richiesti
         if not data or "moto_id" not in data or "start_date" not in data or "end_date" not in data:
             return jsonify({"error": "Dati mancanti o non validi."}), 400
 
@@ -761,7 +784,16 @@ def check_moto_availability():
         start_date = datetime.strptime(data["start_date"], "%Y-%m-%d %H:%M:%S")
         end_date = datetime.strptime(data["end_date"], "%Y-%m-%d %H:%M:%S")
 
-        # Verifica la disponibilità usando il metodo nella classe Cart
+        # Controllo se la data di inizio è inferiore alle 24 ore dal momento attuale
+        now = datetime.now()
+        if start_date <= now + timedelta(hours=12):
+            return jsonify({
+                "moto_id": moto_id,
+                "is_booked": True,
+                "message": "La moto è bloccata poiché la data di inizio è inferiore alle 24 ore."
+            }), 200
+
+        # Verifica la disponibilità tramite la classe Cart
         is_booked = Cart.is_bike_booked(moto_id, start_date, end_date)
 
         return jsonify({
@@ -773,9 +805,8 @@ def check_moto_availability():
         return jsonify({"error": "Formato data non valido. Usa il formato YYYY-MM-DD HH:MM:SS."}), 400
     except Exception as e:
         return jsonify({"error": f"Errore durante il controllo della disponibilità: {str(e)}"}), 500
-
+    
 ######################## CARTS #########################
-
 
 @api.route('/cart/create', methods=['POST'])
 @jwt_required()  # 🔐 Richiede autenticazione JWT
@@ -804,7 +835,6 @@ def create_cart():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante la creazione del carrello: {str(e)}"}), 500
-
 
 @api.route('/cart', methods=['POST'])
 @jwt_required()
@@ -854,7 +884,6 @@ def add_item_to_user_cart():
         # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante l'aggiunta del prodotto: {str(e)}"}), 500
 
-
 @api.route('/cart/remove/<int:item_id>', methods=['DELETE'])
 @jwt_required()
 def remove_item_from_cart(item_id):
@@ -883,7 +912,6 @@ def remove_item_from_cart(item_id):
         # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante la rimozione del prodotto: {str(e)}"}), 500
 
-
 @api.route('/cart', methods=['GET'])
 @jwt_required()
 def get_user_cart_basic():
@@ -905,7 +933,6 @@ def get_user_cart_basic():
     except Exception as e:
         # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante il recupero del carrello: {str(e)}"}), 500
-
 
 @api.route('/cart/detailed', methods=['GET'])
 @jwt_required()
@@ -930,7 +957,6 @@ def get_user_cart_detailed():
         return jsonify({"error": f"Errore durante il recupero dettagliato del carrello: {str(e)}"}), 500
 
 ######################## BOOKINGS #########################
-
 
 @api.route('/booking', methods=['POST'])
 @jwt_required()
@@ -997,7 +1023,6 @@ def create_booking():
     except Exception as e:
         return jsonify({"error": f"Errore durante la creazione della prenotazione: {str(e)}"}), 500
 
-
 @api.route('/booking/<int:booking_id>', methods=['DELETE'])
 @jwt_required()
 def delete_booking(booking_id):
@@ -1018,7 +1043,6 @@ def delete_booking(booking_id):
 
     except Exception as e:
         return jsonify({"error": f"Errore durante la cancellazione della prenotazione: {str(e)}"}), 500
-
 
 @api.route('/all-bookings', methods=['GET'])
 @jwt_required()
@@ -1062,7 +1086,6 @@ def get_all_bookings():
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero delle prenotazioni: {str(e)}"}), 500
 
-
 @api.route('/booking/<int:booking_id>', methods=['PUT'])
 @jwt_required()
 def update_booking(booking_id):
@@ -1091,7 +1114,6 @@ def update_booking(booking_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiornamento della prenotazione: {str(e)}"}), 500
 
-
 @api.route('/booking/user', methods=['GET'])
 @jwt_required()
 def get_user_bookings():
@@ -1119,7 +1141,6 @@ def get_user_bookings():
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero delle prenotazioni: {str(e)}"}), 500
 
-
 @api.route('/bookings/vehicle/<int:bike_id>', methods=['GET'])
 def get_bookings_by_vehicle(bike_id):
     try:
@@ -1138,7 +1159,6 @@ def get_bookings_by_vehicle(bike_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero delle prenotazioni: {str(e)}"}), 500
 
-
 @api.route('/booking/<int:booking_id>/payment', methods=['PATCH'])
 @jwt_required()
 def update_payment_status(booking_id):
@@ -1156,7 +1176,6 @@ def update_payment_status(booking_id):
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiornamento dello stato di pagamento: {str(e)}"}), 500
-
 
 @api.route('/cart/submit', methods=['POST'])
 @jwt_required()
@@ -1191,7 +1210,6 @@ def submit_cart():
     except Exception as e:
         return jsonify({"error": f"Errore durante la sottomissione del carrello: {str(e)}"}), 500
 
-
 @api.route('/cart/clear', methods=['DELETE'])
 @jwt_required()
 def clear_cart():
@@ -1218,7 +1236,6 @@ def clear_cart():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante la cancellazione del carrello: {str(e)}"}), 500
-
 
 @api.route('/booking/code/<int:generated_code>', methods=['GET'])
 @jwt_required()
@@ -1294,7 +1311,6 @@ def get_booking_by_code(generated_code):
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero della prenotazione: {str(e)}"}), 500
 
-
 @api.route('/check-user-booking-conflict', methods=['POST'])
 @jwt_required()
 def check_user_booking_conflict():
@@ -1335,7 +1351,6 @@ def check_user_booking_conflict():
     except Exception as e:
         return jsonify({"error": f"Errore durante il controllo del conflitto: {str(e)}"}), 500
 
-
 @api.route('/bookings_by_name', methods=['GET'])
 @jwt_required()
 def get_bookings_by_name():
@@ -1356,7 +1371,6 @@ def get_bookings_by_name():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante la ricerca delle prenotazioni: {str(e)}"}), 500
-
 
 @api.route('/booking/generate-code', methods=['POST'])
 @jwt_required()
@@ -1391,7 +1405,6 @@ def generate_booking_code_without_saving():
 
 ########################## UTILS ##########################
 
-
 @api.route('/booking/<int:booking_id>/toggle-pickup', methods=['PATCH'])
 @jwt_required()
 def toggle_pickup(booking_id):
@@ -1406,7 +1419,6 @@ def toggle_pickup(booking_id):
 
     except Exception as e:
         return jsonify({"error": f"Errore durante il toggle del campo pickup: {str(e)}"}), 500
-
 
 @api.route('/booking/<int:booking_id>/toggle-return', methods=['PATCH'])
 @jwt_required()
@@ -1423,7 +1435,6 @@ def toggle_return(booking_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante il toggle del campo return: {str(e)}"}), 500
 
-
 @api.route('/booking/<int:booking_id>/toggle-payment', methods=['PATCH'])
 @jwt_required()
 def toggle_payment_status(booking_id):
@@ -1439,7 +1450,6 @@ def toggle_payment_status(booking_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante il toggle del campo payment_status: {str(e)}"}), 500
 
-
 @api.route('/protected', methods=['GET'])
 @jwt_required()
 def protected_route():
@@ -1448,7 +1458,6 @@ def protected_route():
     """
     user_id = get_jwt_identity()
     return jsonify({"message": f"Accesso consentito. ID utente: {user_id}"}), 200
-
 
 @api.route('/booking/add-code', methods=['POST'])
 @jwt_required()
@@ -1480,7 +1489,6 @@ def api_add_booking_code():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiunta del codice: {str(e)}"}), 500
-
 
 @api.route('/user/<int:user_id>/send-email', methods=['POST'])
 @jwt_required()
