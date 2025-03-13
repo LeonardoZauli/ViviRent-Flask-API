@@ -273,18 +273,22 @@ def check_auth():
     return jsonify({"message": f"User {current_user} is authenticated"}), 200
 
 @api.route('/refresh', methods=['POST'])
-@jwt_required(refresh=True)  # Richiede un refresh token valido
+@jwt_required(refresh=True)
 def refresh_token():
-    """
-    Genera un nuovo access token
-    """
-    try:
-        user_id = get_jwt_identity()  # Ottiene l'utente attuale
-        new_access_token = create_access_token(identity=user_id)  # Crea un nuovo token accesso
-        return jsonify({"access_token": new_access_token}), 200
-    except Exception as e:
-        return jsonify({"error": f"Errore durante il refresh token: {str(e)}"}), 500
-  
+    user_id = get_jwt_identity()
+    new_access_token = create_access_token(identity=user_id, expires_delta=timedelta(hours=1))
+
+    response = make_response(jsonify({"message": "Token refreshed"}))
+    response.set_cookie(
+        "access_token",
+        new_access_token,
+        httponly=True,
+        secure=True,
+        samesite="None",
+        path="/"
+    )
+    return response, 200
+
 @api.route('/get-role', methods=['GET'])
 @jwt_required()  # ✅ Verifica il token JWT nel cookie httpOnly
 def get_role():

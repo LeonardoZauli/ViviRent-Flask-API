@@ -1,0 +1,1004 @@
+swagger: "2.0"
+info:
+  title: "ViviRent - API"
+  description: "API documentation"
+  version: "1.0.0"
+host: "localhost:5000"
+schemes:
+  - "https"
+basePath: "/api"
+securityDefinitions:
+  Bearer:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: "JWT Token da inserire come 'Bearer <token>'"
+tags:
+  - name: "Vehicles"
+    description: "Gestione dei veicoli"
+  - name: "Users"
+    description: "Gestione degli utenti"
+  - name: "Cart"
+    description: "Gestione dei carrelli"
+  - name: "Bookings"
+    description: "Gestione delle prenotazioni"
+  - name: "Utils"
+    description: "Strumenti utili"
+
+security:
+  - Bearer: []
+paths:
+  /register:
+    post:
+      summary: "Registra un nuovo utente"
+      description: "Endpoint per registrare un nuovo utente"
+      tags:
+        - Users
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              name:
+                type: "string"
+              surname:
+                type: "string"
+              email:
+                type: "string"
+              password:
+                type: "string"
+              bday:
+                type: "string"
+                format: "date"
+              place:
+                type: "string"
+      responses:
+        200:
+          description: "Registrazione avvenuta con successo"
+        400:
+          description: "Errore nei dati inviati"
+        500:
+          description: "Errore del server"
+
+  /login:
+    post:
+      summary: "Effettua il login dell'utente"
+      description: "Endpoint per effettuare il login e restituire il JWT nei cookie"
+      tags:
+        - Users
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              email:
+                type: "string"
+              password:
+                type: "string"
+      responses:
+        200:
+          description: "Login avvenuto con successo"
+        401:
+          description: "Credenziali non valide"
+
+  /update-profile:
+    put:
+      summary: "Aggiorna il profilo dell'utente"
+      description: "Permette all'utente autenticato di aggiornare il proprio profilo"
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              name:
+                type: "string"
+              surname:
+                type: "string"
+              email:
+                type: "string"
+              bday:
+                type: "string"
+                format: "date"
+              place:
+                type: "string"
+      responses:
+        200:
+          description: "Profilo aggiornato con successo"
+        400:
+          description: "Errore nei dati inviati"
+        404:
+          description: "Utente non trovato"
+
+  /delete-profile:
+    delete:
+      summary: "Elimina il profilo dell'utente"
+      description: "Cancella l'account dell'utente autenticato"
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Account eliminato con successo"
+        404:
+          description: "Utente non trovato"
+
+  /logout:
+    post:
+      tags:
+        - Users
+      summary: "Logout dell'utente"
+      description: "Disconnette l'utente e rimuove i cookie di autenticazione"
+      responses:
+        200:
+          description: "Logout effettuato con successo"
+
+  /protected:
+    get:
+      summary: "Endpoint protetto"
+      tags:
+        - Users
+      description: "Verifica se l'utente è autenticato"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Accesso consentito"
+
+  /check-auth:
+    get:
+      summary: "Verifica autenticazione utente"
+      tags:
+        - Users
+      description: "Controlla se l'utente è autenticato tramite JWT"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Utente autenticato"
+
+  /refresh:
+    post:
+      summary: "Genera un nuovo token di accesso"
+      tags:
+        - Users
+      description: "Utilizza il refresh token per generare un nuovo access token"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Nuovo access token generato"
+        500:
+          description: "Errore nel refresh del token"
+
+  /get-role:
+    get:
+      summary: "Ottiene il ruolo dell'utente"
+      tags:
+        - Users
+      description: "Recupera il ruolo dell'utente autenticato dal JWT"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Ruolo recuperato con successo"
+        400:
+          description: "Ruolo non trovato"
+
+  /users:
+    get:
+      summary: "Recupera tutti gli utenti"
+      tags:
+        - Users
+      description: "Recupera tutti gli utenti registrati (solo per amministratori)"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Lista utenti recuperata con successo"
+        403:
+          description: "Accesso negato"
+
+  /profile:
+    get:
+      summary: "Recupera il profilo dell'utente"
+      tags:
+        - Users
+      description: "Ritorna le informazioni del profilo dell'utente autenticato"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Profilo utente recuperato con successo"
+        404:
+          description: "Utente non trovato"
+
+  /change-password:
+    post:
+      summary: "Cambia la password dell'utente"
+      tags:
+        - Users
+      description: "Permette a un utente autenticato di cambiare la password"
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              current_password:
+                type: "string"
+              new_password:
+                type: "string"
+      responses:
+        200:
+          description: "Password aggiornata con successo"
+        400:
+          description: "Errore nei dati inviati"
+
+  /password-reset/request:
+    post:
+      summary: "Richiede il reset della password"
+      tags:
+        - Users
+      description: "Genera un token per il reset della password"
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              email:
+                type: "string"
+      responses:
+        200:
+          description: "Token di reset generato"
+        400:
+          description: "Email non trovata"
+
+  /password-reset/{token}:
+    post:
+      summary: "Resetta la password"
+      tags:
+        - Users
+      description: "Permette all'utente di aggiornare la password dopo il reset"
+      parameters:
+        - in: "path"
+          name: "token"
+          required: true
+          type: "string"
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              new_password:
+                type: "string"
+      responses:
+        200:
+          description: "Password aggiornata con successo"
+        400:
+          description: "Errore nei dati inviati"
+        404:
+          description: "Utente non trovato"
+
+  /vehicles:
+    get:
+      summary: "Restituisce tutti i veicoli attivi disponibili"
+      tags:
+        - Vehicles
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Lista di tutti i veicoli attivi"
+        500:
+          description: "Errore durante il recupero dei veicoli"
+
+    post:
+      summary: "Aggiunge un nuovo veicolo (solo admin)"
+      tags:
+        - Vehicles
+      security:
+        - Bearer: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              vehicle_type:
+                type: string
+              brand:
+                type: string
+              model:
+                type: string
+              year:
+                type: integer
+              price_per_hour:
+                type: number
+              license_plate:
+                type: string
+              driving_license:
+                type: string
+              power:
+                type: number
+              engine_size:
+                type: number
+              fuel_type:
+                type: string
+              is_active:
+                type: boolean
+              description:
+                type: string
+              image_url:
+                type: string
+              deposit:
+                type: number
+      responses:
+        200:
+          description: "Veicolo aggiunto con successo"
+        500:
+          description: "Errore durante l'aggiunta del veicolo"
+
+  /vehicles/{vehicle_id}:
+    get:
+      summary: "Recupera i dettagli di un veicolo tramite ID"
+      tags:
+        - Vehicles
+      security:
+        - Bearer: []
+      parameters:
+        - name: vehicle_id
+          in: path
+          required: true
+          type: integer
+          description: "L'ID del veicolo da recuperare"
+      responses:
+        200:
+          description: "Dati del veicolo trovati con successo"
+        404:
+          description: "Veicolo non trovato"
+
+    delete:
+      summary: "Elimina un veicolo specifico tramite ID (solo admin)"
+      tags:
+        - Vehicles
+      security:
+        - Bearer: []
+      parameters:
+        - name: vehicle_id
+          in: path
+          required: true
+          type: integer
+          description: "ID del veicolo da eliminare"
+      responses:
+        200:
+          description: "Veicolo eliminato con successo"
+        404:
+          description: "Veicolo non trovato"
+        403:
+          description: "Accesso negato, permessi insufficienti"
+
+  /vehicles/license/{license_type}:
+    get:
+      summary: "Recupera i veicoli disponibili per una determinata patente"
+      tags:
+        - Vehicles
+      security:
+        - Bearer: []
+      parameters:
+        - name: license_type
+          in: path
+          required: true
+          type: string
+          description: "Tipo di patente richiesta (es. A, A1, B)"
+      responses:
+        200:
+          description: "Lista dei veicoli per il tipo di patente richiesto"
+        404:
+          description: "Nessun veicolo trovato per il tipo di patente"
+
+  /vehicles/available:
+    get:
+      summary: "Recupera solo i veicoli attualmente disponibili"
+      tags:
+        - Vehicles
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Lista di tutti i veicoli disponibili"
+        404:
+          description: "Nessun veicolo disponibile trovato"
+
+  /vehicles/update/{vehicle_id}:
+    put:
+      summary: "Modifica i dettagli di un veicolo specifico (solo admin)"
+      tags:
+        - Vehicles
+      security:
+        - Bearer: []
+      parameters:
+        - name: vehicle_id
+          in: path
+          required: true
+          type: integer
+          description: "ID del veicolo da aggiornare"
+      responses:
+        200:
+          description: "Veicolo aggiornato con successo"
+        404:
+          description: "Veicolo non trovato"
+        403:
+          description: "Accesso negato, permessi insufficienti"
+
+  /vehicles/available-range:
+    get:
+      summary: "Recupera i veicoli disponibili in un intervallo di date"
+      tags:
+        - Vehicles
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          type: string
+          description: "Data di inizio nel formato ISO (es. 2025-02-27T09:00:00)"
+        - name: end_date
+          in: query
+          required: true
+          type: string
+          description: "Data di fine nel formato ISO (es. 2025-02-28T17:00:00)"
+      responses:
+        200:
+          description: "Lista di veicoli disponibili"
+        400:
+          description: "Errore nei parametri forniti"
+
+  /cart/create:
+    post:
+      summary: "Crea un nuovo carrello per l'utente autenticato"
+      description: "Genera un carrello vuoto per l'utente autenticato"
+      tags:
+        - Cart
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Carrello creato con successo"
+        500:
+          description: "Errore durante la creazione del carrello"
+
+  /cart:
+    post:
+      summary: "Aggiunge un prodotto al carrello dell'utente"
+      description: "Permette di aggiungere un prodotto a un carrello attivo"
+      tags:
+        - Cart
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              moto_id:
+                type: "integer"
+              start_date:
+                type: "string"
+                format: "date-time"
+                description: "Data di inizio del noleggio (ISO 8601)"
+              end_date:
+                type: "string"
+                format: "date-time"
+                description: "Data di fine del noleggio (ISO 8601)"
+              price:
+                type: "number"
+                format: "float"
+                description: "Prezzo totale del noleggio"
+              accessories:
+                type: "array"
+                items:
+                  type: "string"
+                description: "Lista degli accessori opzionali"
+      responses:
+        200:
+          description: "Prodotto aggiunto con successo al carrello"
+        400:
+          description: "Errore nei dati forniti"
+        404:
+          description: "Nessun carrello attivo trovato"
+        500:
+          description: "Errore durante l'aggiunta del prodotto"
+
+    get:
+      summary: "Recupera il carrello attivo dell'utente"
+      description: "Ottiene i prodotti presenti nel carrello dell'utente autenticato"
+      tags:
+        - Cart
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Dati del carrello restituiti con successo"
+        404:
+          description: "Nessun carrello attivo trovato"
+        500:
+          description: "Errore durante il recupero del carrello"
+
+  /cart/remove/{item_id}:
+    delete:
+      summary: "Rimuove un prodotto dal carrello"
+      description: "Elimina un prodotto specifico dal carrello dell'utente autenticato"
+      tags:
+        - Cart
+      security:
+        - Bearer: []
+      parameters:
+        - name: "item_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID dell'elemento da rimuovere dal carrello"
+      responses:
+        200:
+          description: "Prodotto rimosso con successo dal carrello"
+        400:
+          description: "Errore nei dati forniti"
+        404:
+          description: "Nessun carrello attivo trovato"
+        500:
+          description: "Errore durante la rimozione del prodotto"
+
+  /cart/detailed:
+    get:
+      summary: "Recupera il carrello dell'utente con informazioni dettagliate"
+      description: "Ottiene i dettagli completi degli articoli nel carrello dell'utente autenticato"
+      tags:
+        - Cart
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Dati dettagliati del carrello restituiti con successo"
+        404:
+          description: "Nessun carrello attivo trovato"
+        500:
+          description: "Errore durante il recupero dettagliato del carrello"
+
+  /booking:
+    post:
+      summary: "Crea una nuova prenotazione"
+      description: "Permette all'utente autenticato di effettuare una prenotazione"
+      tags:
+        - Bookings
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              bike_id:
+                type: "integer"
+              start_date:
+                type: "string"
+                format: "date-time"
+                description: "Data di inizio (YYYY-MM-DD HH:MM:SS)"
+              end_date:
+                type: "string"
+                format: "date-time"
+                description: "Data di fine (YYYY-MM-DD HH:MM:SS)"
+              total_price:
+                type: "number"
+                format: "float"
+                description: "Prezzo totale"
+              dl_type:
+                type: "string"
+                description: "Tipo di patente"
+              dl_expiration:
+                type: "string"
+                format: "date"
+                description: "Data di scadenza della patente (YYYY-MM-DD)"
+              dl_number:
+                type: "string"
+                description: "Numero della patente"
+              accessories:
+                type: "array"
+                items:
+                  type: "string"
+                description: "Lista accessori opzionali"
+              helmet_size:
+                type: "string"
+                description: "Taglia casco (se applicabile)"
+              gloves_size:
+                type: "string"
+                description: "Taglia guanti (se applicabile)"
+              pickup:
+                type: "boolean"
+                description: "Consegna a domicilio"
+              return_:
+                type: "boolean"
+                description: "Restituzione a domicilio"
+      responses:
+        201:
+          description: "Prenotazione creata con successo"
+        400:
+          description: "Errore nei dati forniti"
+        500:
+          description: "Errore durante la creazione della prenotazione"
+
+  /booking/{booking_id}:
+    delete:
+      summary: "Elimina una prenotazione"
+      description: "Permette all'utente di cancellare una prenotazione esistente"
+      tags:
+        - Bookings
+      security:
+        - Bearer: []
+      parameters:
+        - name: "booking_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID della prenotazione da cancellare"
+      responses:
+        200:
+          description: "Prenotazione cancellata con successo"
+        404:
+          description: "Prenotazione non trovata"
+        500:
+          description: "Errore durante la cancellazione della prenotazione"
+
+    put:
+      summary: "Aggiorna una prenotazione"
+      description: "Permette all'utente di modificare una prenotazione esistente"
+      tags:
+        - Bookings
+      security:
+        - Bearer: []
+      parameters:
+        - name: "booking_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID della prenotazione da aggiornare"
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              start_date:
+                type: "string"
+                format: "date-time"
+              end_date:
+                type: "string"
+                format: "date-time"
+              total_price:
+                type: "number"
+              accessories:
+                type: "array"
+                items:
+                  type: "string"
+      responses:
+        200:
+          description: "Prenotazione aggiornata con successo"
+        400:
+          description: "Errore nei dati forniti"
+        404:
+          description: "Prenotazione non trovata"
+        500:
+          description: "Errore durante l'aggiornamento della prenotazione"
+
+  /all-bookings:
+    get:
+      summary: "Recupera tutte le prenotazioni"
+      description: "Permette agli amministratori di ottenere l'elenco completo delle prenotazioni"
+      tags:
+        - Bookings
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Elenco prenotazioni recuperato con successo"
+        500:
+          description: "Errore durante il recupero delle prenotazioni"
+
+  /booking/user:
+    get:
+      summary: "Recupera le prenotazioni dell'utente autenticato"
+      description: "Ottiene tutte le prenotazioni effettuate dall'utente corrente"
+      tags:
+        - Bookings
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Prenotazioni utente recuperate con successo"
+        500:
+          description: "Errore durante il recupero delle prenotazioni"
+
+  /bookings/vehicle/{bike_id}:
+    get:
+      summary: "Recupera le prenotazioni di un veicolo specifico"
+      description: "Ottiene tutte le prenotazioni associate a un veicolo"
+      tags:
+        - Bookings
+      parameters:
+        - name: "bike_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID del veicolo"
+      responses:
+        200:
+          description: "Elenco prenotazioni del veicolo recuperato con successo"
+        404:
+          description: "Nessuna prenotazione trovata per il veicolo"
+        500:
+          description: "Errore durante il recupero delle prenotazioni"
+
+  /booking/{booking_id}/payment:
+    patch:
+      summary: "Aggiorna lo stato di pagamento della prenotazione"
+      description: "Modifica lo stato di pagamento per una prenotazione esistente"
+      tags:
+        - Bookings
+      security:
+        - Bearer: []
+      parameters:
+        - name: "booking_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID della prenotazione"
+      responses:
+        200:
+          description: "Stato di pagamento aggiornato con successo"
+        400:
+          description: "Errore nei dati forniti"
+        404:
+          description: "Prenotazione non trovata"
+        500:
+          description: "Errore durante l'aggiornamento del pagamento"
+
+  /booking/code/{generated_code}:
+    get:
+      summary: "Recupera una prenotazione tramite codice generato"
+      description: "Ottiene i dettagli della prenotazione utilizzando un codice di conferma"
+      tags:
+        - Bookings
+      security:
+        - Bearer: []
+      parameters:
+        - name: "generated_code"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "Codice di prenotazione generato"
+      responses:
+        200:
+          description: "Prenotazione trovata con successo"
+        404:
+          description: "Prenotazione non trovata"
+        403:
+          description: "Accesso negato"
+        500:
+          description: "Errore durante il recupero della prenotazione"
+
+  /check-user-booking-conflict:
+    post:
+      summary: "Verifica conflitti di prenotazione per l'utente"
+      description: "Controlla se l'utente ha già prenotazioni nello stesso intervallo di date"
+      tags:
+        - Bookings
+      consumes:
+        - application/json
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              start_date:
+                type: "string"
+                format: "date-time"
+              end_date:
+                type: "string"
+                format: "date-time"
+      responses:
+        200:
+          description: "Conflitto verificato con successo"
+        400:
+          description: "Errore nei dati forniti"
+        500:
+          description: "Errore durante il controllo dei conflitti"
+
+  /bookings_by_name:
+    get:
+      summary: "Cerca prenotazioni per nome e cognome"
+      description: "Recupera prenotazioni filtrando per nome e cognome"
+      tags:
+        - Bookings
+      security:
+        - Bearer: []
+      parameters:
+        - name: "first_name"
+          in: "query"
+          required: true
+          type: "string"
+          description: "Nome del cliente"
+        - name: "last_name"
+          in: "query"
+          required: true
+          type: "string"
+          description: "Cognome del cliente"
+      responses:
+        200:
+          description: "Prenotazioni recuperate con successo"
+        400:
+          description: "Parametri mancanti"
+        500:
+          description: "Errore durante la ricerca delle prenotazioni"
+
+  /booking/{booking_id}/toggle-pickup:
+    patch:
+      summary: "Attiva/Disattiva l'opzione di ritiro per una prenotazione"
+      description: "Modifica il valore del campo 'pickup' per una prenotazione specifica"
+      tags:
+        - Utils
+      security:
+        - Bearer: []
+      parameters:
+        - name: "booking_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID della prenotazione"
+      responses:
+        200:
+          description: "Stato pickup aggiornato con successo"
+        404:
+          description: "Prenotazione non trovata"
+        500:
+          description: "Errore durante l'aggiornamento del campo pickup"
+
+  /booking/{booking_id}/toggle-return:
+    patch:
+      summary: "Attiva/Disattiva l'opzione di restituzione per una prenotazione"
+      description: "Modifica il valore del campo 'return' per una prenotazione specifica"
+      tags:
+        - Utils
+      security:
+        - Bearer: []
+      parameters:
+        - name: "booking_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID della prenotazione"
+      responses:
+        200:
+          description: "Stato return aggiornato con successo"
+        404:
+          description: "Prenotazione non trovata"
+        500:
+          description: "Errore durante l'aggiornamento del campo return"
+
+  /booking/{booking_id}/toggle-payment:
+    patch:
+      summary: "Attiva/Disattiva lo stato di pagamento per una prenotazione"
+      description: "Modifica il valore del campo 'payment_status' per una prenotazione specifica"
+      tags:
+        - Utils
+      security:
+        - Bearer: []
+      parameters:
+        - name: "booking_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID della prenotazione"
+      responses:
+        200:
+          description: "Stato payment_status aggiornato con successo"
+        404:
+          description: "Prenotazione non trovata"
+        500:
+          description: "Errore durante l'aggiornamento del campo payment_status"
+
+  /booking/add-code:
+    post:
+      summary: "Aggiunge un codice di prenotazione"
+      description: "Permette di associare un codice generato a una prenotazione esistente"
+      tags:
+        - Utils
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              booking_id:
+                type: "integer"
+                description: "ID della prenotazione"
+              generated_code:
+                type: "string"
+                description: "Codice di prenotazione generato"
+      responses:
+        200:
+          description: "Codice di prenotazione aggiunto con successo"
+        400:
+          description: "Dati richiesti mancanti o non validi"
+        500:
+          description: "Errore durante l'aggiunta del codice"
+
+  /user/{user_id}/send-email:
+    post:
+      summary: "Invia un'email a un utente specifico"
+      description: "Permette di inviare un'email a un utente identificato tramite il suo ID"
+      tags:
+        - Utils
+      security:
+        - Bearer: []
+      parameters:
+        - name: "user_id"
+          in: "path"
+          required: true
+          type: "integer"
+          description: "ID dell'utente destinatario dell'email"
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              subject:
+                type: "string"
+                description: "Oggetto dell'email"
+              body:
+                type: "string"
+                description: "Contenuto dell'email"
+      responses:
+        200:
+          description: "Email inviata con successo"
+        400:
+          description: "Dati richiesti mancanti o non validi"
+        404:
+          description: "Utente non trovato"
+        500:
+          description: "Errore durante l'invio dell'email"
