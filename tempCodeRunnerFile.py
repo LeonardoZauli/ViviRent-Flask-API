@@ -1,8 +1,6 @@
-from flask import Flask
-from extensions import mail  # Importa l'estensione Mail
-from config import Config
-from models import db
-from routes import api  # Importa il Blueprint definito
-from flasgger import Swagger
-from flask_cors import CORS
-from flask_jwt_extended import JWTManager
+app.config['JWT_TOKEN_LOCATION'] = ['cookies']
+app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token'
+app.config['JWT_REFRESH_COOKIE_NAME'] = 'refresh_token'
+app.config['JWT_COOKIE_CSRF_PROTECT'] = False
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=0.3)  # Scadenza access_token
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)  # Scadenza refresh_token

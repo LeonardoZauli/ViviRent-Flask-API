@@ -22,3 +22,4 @@ def send_confirmation_code(email):
     mail.send(msg)
 
     return confirmation_code
+

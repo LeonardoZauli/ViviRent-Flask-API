@@ -8,12 +8,12 @@ class Config:
     DEBUG = True
     SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fallback_jwt_secret_key")
-
-    # Ridurre la durata del token accesso a 1 ora
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
-
-    # Refresh token dura 7 giorni
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
+    JWT_TOKEN_LOCATION = ['cookies']
+    JWT_ACCESS_COOKIE_NAME = 'access_token'
+    JWT_REFRESH_COOKIE_NAME = 'refresh_token'
+    JWT_COOKIE_CSRF_PROTECT = False
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=20)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
 
     SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///default.db")
     SQLALCHEMY_TRACK_MODIFICATIONS = False

@@ -5,7 +5,7 @@ from models import db, User, Vehicle, Cart, Booking, BookingCode, TokenBlacklist
 import datetime as dt  # Rinominato per evitare conflitti
 from datetime import datetime  # Classe datetime senza conflitti
 from datetime import timedelta  # ✅ Import corretto
-import re
+from config import Config  # ✅ Importa Config per accedere alle variabili di configurazione
 from dateutil import parser  # Aggiungi questa importazione in cima al file
 from functools import wraps
 
@@ -14,6 +14,7 @@ jwt_blacklist = set()
 
 # ✅ Creazione del Blueprint
 api = Blueprint('api', __name__)
+
 
 # 🔒 Controllo ruolo admin
 def admin_required(fn):
@@ -29,6 +30,7 @@ def admin_required(fn):
     return wrapper
   
 ########################## USERS ##########################
+
 
 # Endpoint per la registrazione di un nuovo utente
 @api.route('/register', methods=['POST'])
@@ -124,7 +126,8 @@ def register_user():
     except Exception as e:
         return jsonify({"error": f"Errore durante la registrazione: {str(e)}"}), 500
 
-# Login user restituendo un cookie contenente l'accessToken JWT
+
+# 🔥 Login user restituendo un cookie contenente l'accessToken JWT
 @api.route('/login', methods=['POST'])
 def login():
     data = request.json
@@ -140,10 +143,17 @@ def login():
     if not check_password_hash(user.password, password):
         return jsonify({'message': 'Invalid credentials'}), 401
 
-    #print(user)
-    # ✅ Usa l'ID dell'utente come identity
-    access_token = create_access_token(identity=str(user.id), additional_claims={"role": user.role}, expires_delta=dt.timedelta(hours=1))
-    refresh_token = create_refresh_token(identity=str(user.id), additional_claims={"role": user.role}, expires_delta=dt.timedelta(days=7))
+    # ✅ Usa le variabili di configurazione per la durata dei token
+    access_token = create_access_token(
+        identity=str(user.id),
+        additional_claims={"role": user.role},
+        expires_delta=Config.JWT_ACCESS_TOKEN_EXPIRES
+    )
+    refresh_token = create_refresh_token(
+        identity=str(user.id),
+        additional_claims={"role": user.role},
+        expires_delta=Config.JWT_REFRESH_TOKEN_EXPIRES
+    )
 
     response = make_response(jsonify({'message': 'Login successful'}))
     response.set_cookie(
@@ -161,6 +171,7 @@ def login():
         samesite="None"
     )
     return response
+
 
 # Endpoint per l'update del profilo utente
 @api.route('/update-profile', methods=['PUT'])
@@ -198,6 +209,7 @@ def update_user():
     except Exception as e:
         # #print(Errore:", str(e))
         return jsonify({"error": "Errore imprevisto."}), 500
+
 
 @api.route('/update-user/<int:user_id>', methods=['PUT'])
 @jwt_required()
@@ -241,6 +253,7 @@ def update_any_user(user_id):
     except Exception as e:
         return jsonify({"error": f"Errore: {str(e)}"}), 500
 
+
 @api.route('/admin/delete-user/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 @admin_required
@@ -262,6 +275,7 @@ def delete_any_user(user_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante l'eliminazione dell'utente: {str(e)}"}), 500
 
+
 @api.route('/delete-profile', methods=['DELETE'])
 @jwt_required()
 def delete_account():
@@ -281,7 +295,7 @@ def delete_account():
     try:
         # 🔐 Ottieni l'ID utente dal token JWT
         user_id = get_jwt_identity()
-        #print(user_id)
+        # print(user_id)
 
         # 🔄 Elimina l'utente
         result = User.delete_user(user_id)
@@ -299,6 +313,7 @@ def delete_account():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'eliminazione dell'account: {str(e)}"}), 500
+
 
 @api.route('/logout', methods=['POST'])
 def logout():
@@ -322,6 +337,7 @@ def logout():
         path="/"
     )
     return response, 200
+
     
 @api.route("/protected", methods=["GET"])
 @jwt_required()
@@ -329,28 +345,37 @@ def protected():
     current_user = get_jwt_identity()
     return jsonify({"message": f"Hello {current_user}, you are authenticated!"})
 
+
 @api.route("/check-auth", methods=["GET"])
 @jwt_required()  # legge il cookie access_token
 def check_auth():
     current_user = get_jwt_identity()
     return jsonify({"message": f"User {current_user} is authenticated"}), 200
 
-@api.route('/refresh', methods=['POST'])
-@jwt_required(refresh=True)
-def refresh_token():
-    user_id = get_jwt_identity()
-    new_access_token = create_access_token(identity=user_id, expires_delta=timedelta(hours=1))
 
-    response = make_response(jsonify({"message": "Token refreshed"}))
+# 🔄 Endpoint per generare un nuovo access token usando il refresh token
+@api.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)  # Richiede il refresh token
+def refresh_access_token():
+
+    user_id = get_jwt_identity()
+
+    # ✅ Usa la scadenza definita in `Config`
+    new_access_token = create_access_token(identity=user_id, expires_delta=Config.JWT_ACCESS_TOKEN_EXPIRES)
+    response = jsonify({"message": "Token refreshed", "access_token": new_access_token})
+
+    # ✅ Imposta il nuovo access_token nel cookie
     response.set_cookie(
         "access_token",
         new_access_token,
         httponly=True,
-        secure=True,
+        secure=True,  # Imposta a False in locale, True in produzione con HTTPS
         samesite="None",
         path="/"
     )
+
     return response, 200
+
 
 @api.route('/get-role', methods=['GET'])
 @jwt_required()  # ✅ Verifica il token JWT nel cookie httpOnly
@@ -366,6 +391,7 @@ def get_role():
 
     except Exception as e:
         return jsonify({"error": f"Errore nel recupero del ruolo: {str(e)}"}), 500
+
     
 @api.route('/users', methods=['GET'])
 @jwt_required()
@@ -397,13 +423,14 @@ def get_all_users():
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero degli utenti: {str(e)}"}), 500
 
+
 @api.route('/profile', methods=['GET'])
 @jwt_required()
 def get_user_profile():
     try:
         # 🔐 user_id ora è un intero (es: 1)
         user_id = get_jwt_identity()
-        ##print(user_id)
+        # #print(user_id)
         
         # 🔍 Recupera l'utente dal DB usando la PK
         user = User.query.get(user_id)
@@ -416,6 +443,7 @@ def get_user_profile():
         }), 200
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero del profilo: {str(e)}"}), 500
+
 
 @api.route('/change-password', methods=['POST'])
 @jwt_required()  # 🔒 Richiede autenticazione tramite JWT
@@ -447,6 +475,7 @@ def change_password():
     except Exception as e:
         return jsonify({"error": f"Errore durante la modifica della password: {str(e)}"}), 500
 
+
 @api.route('/password-reset/request', methods=['POST'])
 def request_password_reset():
     data = request.get_json()
@@ -464,6 +493,7 @@ def request_password_reset():
     reset_token = create_access_token(identity=user.id, expires_delta=timedelta(minutes=30))
 
     return jsonify({"reset_token": reset_token}), 200
+
 
 @api.route('/password-reset/<string:token>', methods=['POST'])
 @jwt_required()
@@ -498,6 +528,7 @@ def reset_password(token):
 
 ######################### VEHICLES #########################
 
+
 @api.route('/vehicles', methods=['GET'])
 def get_all_vehicles():
     """
@@ -524,6 +555,7 @@ def get_all_vehicles():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero dei veicoli: {str(e)}"}), 500
+
 
 @api.route('/vehicles/<int:vehicle_id>', methods=['GET'])
 def get_vehicle_by_id(vehicle_id):
@@ -561,6 +593,7 @@ def get_vehicle_by_id(vehicle_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero del veicolo: {str(e)}"}), 500
 
+
 @api.route('/vehicles/license/<string:license_type>', methods=['GET'])
 def get_vehicles_by_license(license_type):
     """
@@ -597,6 +630,7 @@ def get_vehicles_by_license(license_type):
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero dei veicoli: {str(e)}"}), 500
 
+
 @api.route('/vehicles/available', methods=['GET'])
 def get_available_vehicles():
     """
@@ -626,6 +660,7 @@ def get_available_vehicles():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero dei veicoli disponibili: {str(e)}"}), 500
+
 
 @api.route('/vehicles', methods=['POST'])
 @jwt_required()  # 🔐 Richiede autenticazione JWT
@@ -722,6 +757,7 @@ def update_vehicle(vehicle_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiornamento del veicolo: {str(e)}"}), 500
 
+
 @api.route('/vehicles/available-range', methods=['GET'])
 def get_available_vehicles_range():
     """
@@ -774,6 +810,7 @@ def get_available_vehicles_range():
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero dei veicoli disponibili: {str(e)}"}), 500
 
+
 @api.route('/vehicles/<int:vehicle_id>', methods=['DELETE'])
 @jwt_required()  # 🔐 Richiede autenticazione JWT
 @admin_required
@@ -810,6 +847,7 @@ def delete_vehicle(vehicle_id):
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'eliminazione del veicolo: {str(e)}"}), 500
+
 
 @api.route('/check-moto-availability', methods=['POST'])
 def check_moto_availability():
@@ -877,6 +915,7 @@ def check_moto_availability():
     
 ######################## CARTS #########################
 
+
 @api.route('/cart/create', methods=['POST'])
 @jwt_required()  # 🔐 Richiede autenticazione JWT
 def create_cart():
@@ -905,16 +944,17 @@ def create_cart():
     except Exception as e:
         return jsonify({"error": f"Errore durante la creazione del carrello: {str(e)}"}), 500
 
+
 @api.route('/cart', methods=['POST'])
 @jwt_required()
 def add_item_to_user_cart():
     try:
         user_id = get_jwt_identity()
-        ##print(user_id)
+        # #print(user_id)
 
         # 🔍 Recupera il carrello attivo per l'utente
         carts = Cart.get_carts_by_user(user_id)
-        #print(carts)
+        # print(carts)
         active_cart = next((cart for cart in carts if cart['status'] == 'active'), None)
 
         if not active_cart:
@@ -953,6 +993,7 @@ def add_item_to_user_cart():
         # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante l'aggiunta del prodotto: {str(e)}"}), 500
 
+
 @api.route('/cart/remove/<int:item_id>', methods=['DELETE'])
 @jwt_required()
 def remove_item_from_cart(item_id):
@@ -981,6 +1022,7 @@ def remove_item_from_cart(item_id):
         # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante la rimozione del prodotto: {str(e)}"}), 500
 
+
 @api.route('/cart', methods=['GET'])
 @jwt_required()
 def get_user_cart_basic():
@@ -1002,6 +1044,7 @@ def get_user_cart_basic():
     except Exception as e:
         # #print(f"Errore completo: {str(e)}")
         return jsonify({"error": f"Errore durante il recupero del carrello: {str(e)}"}), 500
+
 
 @api.route('/cart/detailed', methods=['GET'])
 @jwt_required()
@@ -1026,6 +1069,7 @@ def get_user_cart_detailed():
         return jsonify({"error": f"Errore durante il recupero dettagliato del carrello: {str(e)}"}), 500
 
 ######################## BOOKINGS #########################
+
 
 @api.route('/booking', methods=['POST'])
 @jwt_required()
@@ -1092,6 +1136,7 @@ def create_booking():
     except Exception as e:
         return jsonify({"error": f"Errore durante la creazione della prenotazione: {str(e)}"}), 500
 
+
 @api.route('/booking/<int:booking_id>', methods=['DELETE'])
 @jwt_required()
 def delete_booking(booking_id):
@@ -1112,6 +1157,7 @@ def delete_booking(booking_id):
 
     except Exception as e:
         return jsonify({"error": f"Errore durante la cancellazione della prenotazione: {str(e)}"}), 500
+
 
 @api.route('/all-bookings', methods=['GET'])
 @jwt_required()
@@ -1166,6 +1212,7 @@ def get_all_bookings():
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero delle prenotazioni: {str(e)}"}), 500
 
+
 @api.route('/booking/<int:booking_id>', methods=['PUT'])
 @jwt_required()
 def update_booking(booking_id):
@@ -1194,6 +1241,7 @@ def update_booking(booking_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiornamento della prenotazione: {str(e)}"}), 500
 
+
 @api.route('/booking/user', methods=['GET'])
 @jwt_required()
 def get_user_bookings():
@@ -1221,6 +1269,7 @@ def get_user_bookings():
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero delle prenotazioni: {str(e)}"}), 500
 
+
 @api.route('/bookings/vehicle/<int:bike_id>', methods=['GET'])
 def get_bookings_by_vehicle(bike_id):
     try:
@@ -1239,6 +1288,7 @@ def get_bookings_by_vehicle(bike_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero delle prenotazioni: {str(e)}"}), 500
 
+
 @api.route('/booking/<int:booking_id>/payment', methods=['PATCH'])
 @jwt_required()
 def update_payment_status(booking_id):
@@ -1256,6 +1306,7 @@ def update_payment_status(booking_id):
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiornamento dello stato di pagamento: {str(e)}"}), 500
+
 
 @api.route('/cart/submit', methods=['POST'])
 @jwt_required()
@@ -1290,6 +1341,7 @@ def submit_cart():
     except Exception as e:
         return jsonify({"error": f"Errore durante la sottomissione del carrello: {str(e)}"}), 500
 
+
 @api.route('/cart/clear', methods=['DELETE'])
 @jwt_required()
 def clear_cart():
@@ -1316,6 +1368,7 @@ def clear_cart():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante la cancellazione del carrello: {str(e)}"}), 500
+
 
 @api.route('/booking/code/<int:generated_code>', methods=['GET'])
 @jwt_required()
@@ -1391,6 +1444,7 @@ def get_booking_by_code(generated_code):
     except Exception as e:
         return jsonify({"error": f"Errore durante il recupero della prenotazione: {str(e)}"}), 500
 
+
 @api.route('/check-user-booking-conflict', methods=['POST'])
 @jwt_required()
 def check_user_booking_conflict():
@@ -1431,6 +1485,7 @@ def check_user_booking_conflict():
     except Exception as e:
         return jsonify({"error": f"Errore durante il controllo del conflitto: {str(e)}"}), 500
 
+
 @api.route('/bookings_by_name', methods=['GET'])
 @jwt_required()
 def get_bookings_by_name():
@@ -1451,6 +1506,7 @@ def get_bookings_by_name():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante la ricerca delle prenotazioni: {str(e)}"}), 500
+
 
 @api.route('/booking/generate-code', methods=['POST'])
 @jwt_required()
@@ -1485,6 +1541,7 @@ def generate_booking_code_without_saving():
 
 ########################## UTILS ##########################
 
+
 @api.route('/booking/<int:booking_id>/toggle-pickup', methods=['PATCH'])
 @jwt_required()
 def toggle_pickup(booking_id):
@@ -1499,6 +1556,7 @@ def toggle_pickup(booking_id):
 
     except Exception as e:
         return jsonify({"error": f"Errore durante il toggle del campo pickup: {str(e)}"}), 500
+
 
 @api.route('/booking/<int:booking_id>/toggle-return', methods=['PATCH'])
 @jwt_required()
@@ -1515,6 +1573,7 @@ def toggle_return(booking_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante il toggle del campo return: {str(e)}"}), 500
 
+
 @api.route('/booking/<int:booking_id>/toggle-payment', methods=['PATCH'])
 @jwt_required()
 def toggle_payment_status(booking_id):
@@ -1530,6 +1589,7 @@ def toggle_payment_status(booking_id):
     except Exception as e:
         return jsonify({"error": f"Errore durante il toggle del campo payment_status: {str(e)}"}), 500
 
+
 @api.route('/protected', methods=['GET'])
 @jwt_required()
 def protected_route():
@@ -1538,6 +1598,7 @@ def protected_route():
     """
     user_id = get_jwt_identity()
     return jsonify({"message": f"Accesso consentito. ID utente: {user_id}"}), 200
+
 
 @api.route('/booking/add-code', methods=['POST'])
 @jwt_required()
@@ -1569,6 +1630,7 @@ def api_add_booking_code():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiunta del codice: {str(e)}"}), 500
+
 
 @api.route('/user/<int:user_id>/send-email', methods=['POST'])
 @jwt_required()
