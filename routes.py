@@ -199,6 +199,69 @@ def update_user():
         # #print(Errore:", str(e))
         return jsonify({"error": "Errore imprevisto."}), 500
 
+@api.route('/update-user/<int:user_id>', methods=['PUT'])
+@jwt_required()
+@admin_required
+def update_any_user(user_id):
+    """
+    Permette agli amministratori di aggiornare un qualsiasi utente specificato nell'URL, incluso il ruolo.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Nessun dato ricevuto per l'aggiornamento."}), 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"error": "Utente non trovato."}), 404
+
+        # ✅ Aggiorna i dati dell'utente
+        user.name = data.get("name", user.name)
+        user.surname = data.get("surname", user.surname)
+        user.bday = data.get("bday", user.bday)
+        user.place = data.get("place", user.place)
+
+        # ✅ Se è stato fornito un nuovo ruolo, verifica e aggiorna
+        new_role = data.get("role")
+        if new_role:
+            if new_role not in ["admin", "user"]:
+                return jsonify({"error": "Ruolo non valido. Usa 'admin' o 'user'."}), 400
+
+            # 🔒 Impedisci di modificare il proprio ruolo (per sicurezza)
+            current_user_id = get_jwt_identity()
+            if user_id == current_user_id:
+                return jsonify({"error": "Non puoi modificare il tuo stesso ruolo."}), 403
+
+            user.role = new_role
+
+        db.session.commit()
+
+        return jsonify({"message": "Utente aggiornato con successo!"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Errore: {str(e)}"}), 500
+
+@api.route('/admin/delete-user/<int:user_id>', methods=['DELETE'])
+@jwt_required()
+@admin_required
+def delete_any_user(user_id):
+    """
+    🗑️ Permette agli amministratori di eliminare qualsiasi utente
+    """
+    try:
+        user_to_delete = User.query.get(user_id)
+
+        if not user_to_delete:
+            return jsonify({"error": "Utente non trovato."}), 404
+
+        db.session.delete(user_to_delete)
+        db.session.commit()
+
+        return jsonify({"message": f"Utente {user_id} eliminato con successo."}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Errore durante l'eliminazione dell'utente: {str(e)}"}), 500
+
 @api.route('/delete-profile', methods=['DELETE'])
 @jwt_required()
 def delete_account():
@@ -573,9 +636,11 @@ def add_vehicle():
         if not data:
             return jsonify({"error": "Dati mancanti o non validi."}), 400
 
-        # Rimuovi 'is_active' dalla lista dei campi obbligatori
+        # ✅ Imposta "motorbike" come tipo veicolo automaticamente
+        vehicle_type = "motorbike"
+
         required_fields = [
-            'vehicle_type', 'brand', 'model', 'year', 'price_per_hour',
+            'brand', 'model', 'year', 'price_per_hour',
             'license_plate', 'driving_license', 'power', 'engine_size',
             'fuel_type', 'description', 'image_url', 'deposit'
         ]
@@ -584,7 +649,7 @@ def add_vehicle():
                 return jsonify({"error": f"Il campo '{field}' è obbligatorio."}), 400
 
         new_vehicle = Vehicle(
-            vehicle_type=data['vehicle_type'],
+            vehicle_type=vehicle_type,  # 🔥 Impostato automaticamente su "motorbike"
             brand=data['brand'],
             model=data['model'],
             year=data['year'],
@@ -594,8 +659,7 @@ def add_vehicle():
             power=data['power'],
             engine_size=data['engine_size'],
             fuel_type=data['fuel_type'],
-            # Usa il default True se non viene inviato
-            is_active=data.get('is_active', True),
+            is_active=data.get('is_active', True),  # Usa il default True se non viene inviato
             description=data['description'],
             image_url=data['image_url'],
             deposit=data['deposit']
@@ -611,6 +675,7 @@ def add_vehicle():
 
     except Exception as e:
         return jsonify({"error": f"Errore durante l'aggiunta del veicolo: {str(e)}"}), 500
+
 
 @api.route('/vehicles/update/<int:vehicle_id>', methods=['PUT'])
 @jwt_required()  # 🔐 Richiede autenticazione JWT
@@ -1053,33 +1118,44 @@ def delete_booking(booking_id):
 @admin_required
 def get_all_bookings():
     try:
-        # 🔍 Recupera tutte le prenotazioni utilizzando il metodo della classe
-        all_bookings = Booking.get_all_bookings()
+        # 🔍 Recupera tutte le prenotazioni direttamente dalla tabella bookings
+        all_bookings = Booking.query.all()
 
-        # 🔄 Aggiunge il codice di prenotazione, nome utente e modello veicolo a ciascun booking
+        # 🔄 Aggiunge nome utente e modello veicolo a ciascun booking
         detailed_bookings = []
         for booking in all_bookings:
-            # 🔢 Recupera il codice di prenotazione
-            booking_code_data = Booking.get_booking_code_by_booking_id(booking['id'])
-            booking_code = (
-                booking_code_data.get('booking_code')
-                if 'booking_code' in booking_code_data
-                else None
-            )
-
             # 🔍 Recupera le informazioni del cliente
-            customer = User.query.get(booking['customer_id'])
+            customer = User.query.get(booking.customer_id)
             customer_name = f"{customer.name} {customer.surname}" if customer else "Non trovato"
 
             # 🔍 Recupera le informazioni del veicolo
-            vehicle = Vehicle.query.get(booking['bike_id'])
+            vehicle = Vehicle.query.get(booking.bike_id)
             vehicle_info = f"{vehicle.brand} {vehicle.model}" if vehicle else "Non trovato"
 
-            # ➕ Aggiunge i dettagli al booking
-            booking['booking_code'] = booking_code
-            booking['customer_name'] = customer_name
-            booking['vehicle_info'] = vehicle_info
-            detailed_bookings.append(booking)
+            # ➕ Costruisce l'oggetto JSON con tutti i dati della tabella + dettagli
+            detailed_bookings.append({
+                "id": booking.id,
+                "bike_id": booking.bike_id,
+                "customer_id": booking.customer_id,
+                "customer_name": customer_name,
+                "start_date": booking.start_date,
+                "end_date": booking.end_date,
+                "total_price": booking.total_price,
+                "status": booking.status,
+                "payment_status": booking.payment_status,
+                "created_at": booking.created_at,
+                "last_update": booking.last_update,
+                "accessories": booking.accessories,
+                "dl_type": booking.dl_type,
+                "dl_expiration": booking.dl_expiration,
+                "dl_number": booking.dl_number,
+                "helmet_size": booking.helmet_size,
+                "gloves_size": booking.gloves_size,
+                "pickup": booking.pickup,
+                "return_": booking.return_,
+                "booking_code": booking.booking_code,  # 🔥 Ora prende il valore direttamente dalla tabella
+                "vehicle_info": vehicle_info
+            })
 
         # ✅ Restituisce tutte le prenotazioni con i dettagli aggiuntivi
         return jsonify({

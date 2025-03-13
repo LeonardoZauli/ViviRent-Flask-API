@@ -721,7 +721,7 @@ paths:
   /all-bookings:
     get:
       summary: "Recupera tutte le prenotazioni"
-      description: "Permette agli amministratori di ottenere l'elenco completo delle prenotazioni"
+      description: "Permette agli amministratori di ottenere l'elenco completo delle prenotazioni con dettagli aggiuntivi."
       tags:
         - Bookings
       security:
@@ -729,6 +729,85 @@ paths:
       responses:
         200:
           description: "Elenco prenotazioni recuperato con successo"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Elenco di tutte le prenotazioni recuperato con successo."
+              bookings:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 38
+                    bike_id:
+                      type: integer
+                      example: 1
+                    customer_id:
+                      type: integer
+                      example: 53
+                    customer_name:
+                      type: string
+                      example: "Luca Cappelletti"
+                    start_date:
+                      type: string
+                      format: date-time
+                      example: "2025-02-27T15:52:00Z"
+                    end_date:
+                      type: string
+                      format: date-time
+                      example: "2025-02-28T15:52:00Z"
+                    total_price:
+                      type: string
+                      example: "90.00"
+                    status:
+                      type: boolean
+                      example: true
+                    payment_status:
+                      type: boolean
+                      example: true
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: "2025-02-26T16:54:01Z"
+                    last_update:
+                      type: string
+                      format: date-time
+                      example: "2025-03-05T11:00:22Z"
+                    accessories:
+                      type: string
+                      example: "[]"
+                    dl_type:
+                      type: string
+                      example: "A"
+                    dl_expiration:
+                      type: string
+                      format: date
+                      example: "2031-02-26"
+                    dl_number:
+                      type: string
+                      example: "Zzzzzz038rr6abwoasjd"
+                    helmet_size:
+                      type: string
+                      example: "M"
+                    gloves_size:
+                      type: string
+                      example: "M"
+                    pickup:
+                      type: boolean
+                      example: true
+                    return_:
+                      type: boolean
+                      example: true
+                    booking_code:
+                      type: string
+                      example: "75214393"
+                    vehicle_info:
+                      type: string
+                      example: "Ducati Desert X"
         500:
           description: "Errore durante il recupero delle prenotazioni"
 
@@ -1002,3 +1081,110 @@ paths:
           description: "Utente non trovato"
         500:
           description: "Errore durante l'invio dell'email"
+
+  /admin/delete-user/{user_id}:
+    delete:
+      summary: "Elimina un utente specifico (solo admin)"
+      description: "Permette agli amministratori di eliminare un utente dal database."
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          type: integer
+          description: "ID dell'utente da eliminare"
+      responses:
+        200:
+          description: "Utente eliminato con successo"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Utente 55 eliminato con successo."
+        404:
+          description: "Utente non trovato"
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Utente non trovato."
+        500:
+          description: "Errore durante l'eliminazione dell'utente"
+
+  /update-user/{user_id}:
+    put:
+      summary: "Aggiorna i dati di un utente (solo admin)"
+      description: "Permette agli amministratori di modificare i dati di un utente, incluso il ruolo."
+      tags:
+        - Users
+      security:
+        - Bearer: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          type: integer
+          description: "ID dell'utente da aggiornare"
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "Mario"
+              surname:
+                type: string
+                example: "Rossi"
+              bday:
+                type: string
+                format: date
+                example: "1990-06-15"
+              place:
+                type: string
+                example: "Roma"
+              role:
+                type: string
+                enum: ["admin", "user"]
+                example: "admin"
+      responses:
+        200:
+          description: "Utente aggiornato con successo"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Utente aggiornato con successo!"
+        400:
+          description: "Dati mancanti o ruolo non valido"
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Ruolo non valido. Usa 'admin' o 'user'."
+        403:
+          description: "Un admin non può modificare il proprio ruolo"
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Non puoi modificare il tuo stesso ruolo."
+        404:
+          description: "Utente non trovato"
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Utente non trovato."
+        500:
+          description: "Errore durante l'aggiornamento dell'utente"
