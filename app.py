@@ -26,7 +26,7 @@ def check_if_token_is_blacklisted(jwt_header, jwt_payload):
     return TokenBlacklist.is_token_blacklisted(jti)
 
 # CORS configuration
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5000", "https://localhost:5173", "https://127.0.0.1:5000"]}})
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5000", "https://localhost:5173", "https://127.0.0.1:5000", "https://vivirent-react-web-production.up.railway.app"]}})
 
 # Inizializzazione Swagger
 init_swagger(app)
