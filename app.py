@@ -44,7 +44,7 @@ def expired_token_callback(jwt_header, jwt_payload):
         return jsonify({"error": "invalid_refresh_token", "message": "Refresh token non valido o scaduto"}), 401
 
 # CORS configuration
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5000", "https://localhost:5176", "https://127.0.0.1:5000", "https://vivirent-react-web-production.up.railway.app"]}})
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": ["https://localhost:5173", "http://127.0.0.1:5000", "https://localhost:5176", "https://127.0.0.1:5000", "https://vivirent-react-web-production.up.railway.app"]}})
 
 # Inizializzazione Swagger
 init_swagger(app)
