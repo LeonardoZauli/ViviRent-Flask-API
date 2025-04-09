@@ -1,7 +1,21 @@
 swagger: "2.0"
 info:
   title: "ViviRent - API"
-  description: "API documentation"
+  description: >
+    Questa documentazione descrive tutte le API REST della piattaforma ViviRent.
+
+    ⚠️ **Autenticazione**:
+    Per accedere agli endpoint protetti, è necessario prima effettuare il login tramite l'endpoint **POST /login**.  
+    Una volta effettuato correttamente il login, il sistema imposta automaticamente i cookie JWT (access e refresh token).
+
+    Swagger UI è già configurato per inviare i cookie nelle richieste (`withCredentials: true`), quindi **non è necessario aggiungere manualmente il token nell'header Authorization**.
+
+    ✅ Per testare le API protette:
+    1. Effettua il login con un utente registrato (POST /login).
+    2. Dopo il login, potrai accedere agli endpoint che richiedono autenticazione.
+    3. Per le operazioni da amministratore, accedi con un account con ruolo `admin`.
+
+    🔒 Alcune API richiedono autorizzazioni elevate (admin): in tal caso, verrà restituito un errore `403` se l’utente non ha i permessi necessari.
   version: "1.0.0"
 host: "localhost:5000"
 schemes:
