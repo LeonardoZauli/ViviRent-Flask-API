@@ -49,16 +49,13 @@ def register_user():
             return jsonify({"error": f"Il campo '{field}' è obbligatorio."}), 400
 
     # ✅ Pulizia e validazione
+
     name = data['name'].strip()
     surname = data['surname'].strip()
     password = data['password'].strip()
     email = data['email'].strip()
     bday_str = data['bday'].strip()
     place = data['place'].strip()
-
-    # ✅ Validazione email
-    if not is_valid_email(email):
-        return jsonify({"error": "Formato email non valido."}), 400
 
     # 🔍 Controllo email già registrata
     if User.is_email_registered(email):
